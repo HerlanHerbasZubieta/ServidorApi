@@ -91,10 +91,10 @@ app.post("/restaurante/comentarios", async (req, res) => {
   }
 });
 
-app.post("/detalleCompra", async (req, res) => {
+app.post("/detalleCompraDelivery", async (req, res) => {
   try {
     const { nombre, direccion, telefono, tarjeta } = req.body;
-    const nombresPlatos = req.body.nombresPlatos;
+    const nombresOrden = req.body.nombresOrden;
     const totalPrecio = req.body.totalPrecio;
     const fechaEntrega = req.body.fechaEntrega;
     const horaEnvio = req.body.horaEnvio;
@@ -104,13 +104,16 @@ app.post("/detalleCompra", async (req, res) => {
       direccion,
       telefono,
       tarjeta,
-      nombresPlatos,
+      nombresOrden,
       totalPrecio,
       fechaEntrega,
       horaEnvio,
     };
 
-    await runQuery("INSERT INTO detalleCompra SET ?", detalleCompraData);
+    await runQuery(
+      "INSERT INTO detalleCompraDelivery SET ?",
+      detalleCompraData
+    );
     res.status(200).send("Compra realizada con éxito");
   } catch (error) {
     res.status(500).send("Error al insertar los datos");
@@ -120,7 +123,7 @@ app.post("/detalleCompra", async (req, res) => {
 app.post("/detalleCompraRestaurante", async (req, res) => {
   try {
     const { nombre, telefono, tarjeta } = req.body;
-    const nombresPlatos = req.body.nombresPlatos;
+    const nombresOrden = req.body.nombresOrden;
     const totalPrecio = req.body.totalPrecio;
     const fechaCompra = req.body.fechaEntrega;
     const horaCompra = req.body.horaEnvio;
@@ -129,14 +132,14 @@ app.post("/detalleCompraRestaurante", async (req, res) => {
 
     const detalleCompraData = {
       numeroMesa,
-    tarjeta,
-    nombresPlatos,
-    tiempoLlegada,
-    fechaCompra,
-    horaCompra,
-    telefono,
-    nombre,
-    totalPrecio,
+      tarjeta,
+      nombresOrden,
+      tiempoLlegada,
+      fechaCompra,
+      horaCompra,
+      telefono,
+      nombre,
+      totalPrecio,
     };
 
     await runQuery(
@@ -170,12 +173,36 @@ app.get("/menu", async (req, res) => {
   }
 });
 
+app.get("/historial/:cliente", async (req, res) => {
+  try {
+    const nombreCliente = req.params.cliente;
+    const [consulta1, consulta2] = await Promise.all([
+      runQuery(
+        "SELECT * FROM detallecomprarestaurante WHERE nombre = ?",
+        nombreCliente
+      ),
+      runQuery(
+        "SELECT * FROM detallecompradelivery WHERE nombre = ?",
+        nombreCliente
+      ),
+    ]);
+
+    const consultas = {
+      compraRestaurante: consulta1,
+      compraDelivery: consulta2,
+    };
+
+    res.json(consultas);
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
 app.get("/menus/:tipo", async (req, res) => {
   try {
     const tipoMenu = req.params.tipo;
     let consulta = "";
-  
-    // Sanitizar el tipoMenu para evitar inyección de SQL
+
     const tipoMenuEscaped = mysql.escape(`${tipoMenu}%`);
     if (tipoMenu == "menufrito") {
       consulta =
@@ -183,7 +210,7 @@ app.get("/menus/:tipo", async (req, res) => {
     } else {
       consulta = "SELECT * FROM menu WHERE nombreMenu LIKE " + tipoMenuEscaped;
     }
-  
+
     const result = await runQuery(consulta);
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
@@ -196,7 +223,9 @@ app.get("/menus/:tipo", async (req, res) => {
 app.get("/correo/:correo", async (req, res) => {
   try {
     const clienteCorreo = req.params.correo;
-    const result = await runQuery("SELECT * FROM cliente WHERE correo = ?", [clienteCorreo]);
+    const result = await runQuery("SELECT * FROM cliente WHERE correo = ?", [
+      clienteCorreo,
+    ]);
     if (result.length > 0) {
       res.status(200).json(result[0]); // Devuelve el primer cliente encontrado
     } else {
