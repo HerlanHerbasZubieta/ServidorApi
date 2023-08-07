@@ -15,129 +15,120 @@ const baseD = {
   port: "3307",
 };
 
-app.get("/", (req, res) => {
-  res.send("hola desde tu primera ruta de la Api");
-});
+const connection = mysql.createPool(baseD);
 
-app.post("/restaurante/cliente", (req, res) => {
-  const { correo, contraseña } = req.body;
-  const values = [correo, contraseña];
-  var connection = mysql.createConnection(baseD);
-  connection.query(
-    "SELECT * FROM cliente WHERE correo = ? AND contraseña = ?",
-    values,
-    (err, result) => {
+// Función para ejecutar una consulta en la base de datos
+function runQuery(sql, params) {
+  return new Promise((resolve, reject) => {
+    connection.query(sql, params, (err, result) => {
       if (err) {
-        res.status(500).send(err);
+        reject(err);
       } else {
-        if (result.length > 0) {
-          res.status(200).send("Usuario encontrado");
-        } else {
-          res.status(400).send("Cliente no existe");
-        }
+        resolve(result);
       }
-    }
-  );
-  connection.end();
-});
-
-app.post("/cambioUsuario", (req, res) => {
-  const { nombre, newNombre, newContraseña } = req.body;
-  const params = [newNombre, newContraseña, nombre];
-  var connection = mysql.createConnection(baseD);
-  connection.query(
-    "UPDATE cliente SET nombre = ?, contraseña = ? WHERE nombre = ?",
-    params,
-    (err, result) => {
-      if (err) {
-        res.status(500).send(err);
-      } else {
-        res.status(200).send("Usuario cambiado");
-      }
-    }
-  );
-  connection.end();
-});
-
-app.post("/restaurante/registro", (req, res) => {
-  const { nombre, correo, contraseña, telefono, avatar } =
-    req.body;
-  const params = [
-    [nombre, correo, contraseña, telefono, avatar],
-  ];
-  var connection = mysql.createConnection(baseD);
-  connection.query(
-    "INSERT INTO cliente (nombre, correo, contraseña, telefono, avatar) VALUES ?",
-    [params],
-    (err, result) => {
-      if (err) {
-        res.status(500).send(err);
-      } else {
-        res.status(200).send("Usuario creado");
-      }
-    }
-  );
-  connection.end();
-});
-
-app.post("/restaurante/comentarios", (req, res) => {
-  const { avatar, nombre, fechaYhora, comentario } = req.body;
-  const params = [[avatar, nombre, fechaYhora, comentario]];
-  var connection = mysql.createConnection(baseD);
-  connection.query(
-    "INSERT INTO comentario (avatar, nombre, fechaYhora, comentario) VALUES ?",
-    [params],
-    (err, result) => {
-      if (err) {
-        res.status(500).send(err);
-      } else {
-        res.status(200).send("Comentario agregado");
-      }
-    }
-  );
-  connection.end();
-});
-
-app.post('/detalleCompra', (req, res) => {
-  const { nombre, direccion, telefono, tarjeta } = req.body;
-  const nombresPlatos = req.body.nombresPlatos; // Concatenar los nombres de los platos en una cadena
-  const totalPrecio = req.body.totalPrecio;
-  const fechaEntrega = req.body.fechaEntrega;
-  const horaEnvio = req.body.horaEnvio;
-
-  const detalleCompraData = {
-    nombre,
-    direccion,
-    telefono,
-    tarjeta,
-    nombresPlatos,
-    totalPrecio,
-    fechaEntrega,
-    horaEnvio,
-  };
-  const connection = mysql.createConnection(baseD);
-
-  connection.query('INSERT INTO detalleCompra SET ?', detalleCompraData, (err, result) => {
-    if (err) {
-      res.status(500).send('Error al insertar los datos');
-    } else {
-      res.status(200).send('Compra realizada con éxito');
-    }
-    connection.end(); // Cierra la conexión después de ejecutar la consulta
+    });
   });
+}
+
+app.post("/restaurante/cliente", async (req, res) => {
+  try {
+    const { correo, contraseña } = req.body;
+    const values = [correo, contraseña];
+    const result = await runQuery(
+      "SELECT * FROM cliente WHERE correo = ? AND contraseña = ?",
+      values
+    );
+
+    if (result.length > 0) {
+      res.status(200).send("Usuario encontrado");
+    } else {
+      res.status(400).send("Cliente no existe");
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
 });
 
-app.post('/detalleCompraRestaurante', (req, res) => {
-  const {nombre, telefono, tarjeta} = req.body
-  const nombresPlatos = req.body.nombresPlatos
-  const totalPrecio = req.body.totalPrecio
-  const fechaCompra = req.body.fechaEntrega;
-  const horaCompra = req.body.horaEnvio;
-  const tiempoLlegada = req.body.valorCombox
-  const numeroMesa = req.body.numeroMesa
+app.post("/cambioUsuario", async (req, res) => {
+  try {
+    const { nombre, newNombre, newContraseña } = req.body;
+    const params = [newNombre, newContraseña, nombre];
+    await runQuery(
+      "UPDATE cliente SET nombre = ?, contraseña = ? WHERE nombre = ?",
+      params
+    );
+    res.status(200).send("Usuario cambiado");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
-  var detalleCompraData = {
-    numeroMesa,
+app.post("/restaurante/registro", async (req, res) => {
+  try {
+    const { nombre, correo, contraseña, telefono, avatar } = req.body;
+    const params = [[nombre, correo, contraseña, telefono, avatar]];
+    await runQuery(
+      "INSERT INTO cliente (nombre, correo, contraseña, telefono, avatar) VALUES ?",
+      [params]
+    );
+    res.status(200).send("Usuario creado");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+app.post("/restaurante/comentarios", async (req, res) => {
+  try {
+    const { avatar, nombre, fechaYhora, comentario } = req.body;
+    const params = [[avatar, nombre, fechaYhora, comentario]];
+    await runQuery(
+      "INSERT INTO comentario (avatar, nombre, fechaYhora, comentario) VALUES ?",
+      [params]
+    );
+    res.status(200).send("Comentario agregado");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+app.post("/detalleCompra", async (req, res) => {
+  try {
+    const { nombre, direccion, telefono, tarjeta } = req.body;
+    const nombresPlatos = req.body.nombresPlatos;
+    const totalPrecio = req.body.totalPrecio;
+    const fechaEntrega = req.body.fechaEntrega;
+    const horaEnvio = req.body.horaEnvio;
+
+    const detalleCompraData = {
+      nombre,
+      direccion,
+      telefono,
+      tarjeta,
+      nombresPlatos,
+      totalPrecio,
+      fechaEntrega,
+      horaEnvio,
+    };
+
+    await runQuery("INSERT INTO detalleCompra SET ?", detalleCompraData);
+    res.status(200).send("Compra realizada con éxito");
+  } catch (error) {
+    res.status(500).send("Error al insertar los datos");
+  }
+});
+
+app.post("/detalleCompraRestaurante", async (req, res) => {
+  try {
+    const { nombre, telefono, tarjeta } = req.body;
+    const nombresPlatos = req.body.nombresPlatos;
+    const totalPrecio = req.body.totalPrecio;
+    const fechaCompra = req.body.fechaEntrega;
+    const horaCompra = req.body.horaEnvio;
+    const tiempoLlegada = req.body.valorCombox;
+    const numeroMesa = req.body.numeroMesa;
+
+    const detalleCompraData = {
+      numeroMesa,
     tarjeta,
     nombresPlatos,
     tiempoLlegada,
@@ -145,93 +136,75 @@ app.post('/detalleCompraRestaurante', (req, res) => {
     horaCompra,
     telefono,
     nombre,
-    totalPrecio
+    totalPrecio,
+    };
+
+    await runQuery(
+      "INSERT INTO detallecomprarestaurante SET ?",
+      detalleCompraData
+    );
+    res.status(200).send("Compra realizada con éxito");
+  } catch (error) {
+    res.status(500).send("Error al insertar los datos");
   }
-
-  const connection = mysql.createConnection(baseD);
-
-  connection.query('INSERT INTO detallecomprarestaurante SET ?', detalleCompraData, (err, result) => {
-    if (err) {
-      res.status(500).send('Error al insertar los datos');
-    } else {
-      res.status(200).send('Compra realizada con éxito');
-    }
-    connection.end(); // Cierra la conexión después de ejecutar la consulta
-  });
-
-
-})
-
-app.get("/comentarios", (req, res) => {
-  var connection = mysql.createConnection(baseD);
-  connection.query("SELECT * FROM comentario", (error, result) => {
-    if (error) {
-      res.status(500).send(error);
-    } else {
-      res.setHeader("Content-Type", "application/json"); // Configurar la cabecera de respuesta como JSON
-      res.status(200).send(JSON.stringify(result)); // Convertir el resultado a JSON y enviarlo como respuesta
-    }
-  });
-  connection.end();
 });
 
-
-
-//mostrar los platos
-app.get("/platos", (req, res) => {
-	var connection = mysql.createConnection(baseD)
-	connection.query("SELECT * FROM plato", (error, result)=>{
-		if (error) {
-			res.status(500).send(error)
-		}else{
-			res.setHeader("Content-Type", "application/json"); 
-      res.status(200).send(JSON.stringify(result)); 
-		}
-	})
-})
-
-app.get("/platos/:tipo", (req, res) => {
-  const tipoPlato = req.params.tipo;
-  var connection = mysql.createConnection(baseD);
-  var consulta = ""
-  
-  // la función escape de mysql para evitar posibles ataques de inyección de SQL
-  const tipoPlatoEscaped = connection.escape(`${tipoPlato}%`);
-  if(tipoPlato == "fritos"){
-    consulta = "SELECT * FROM plato WHERE nombrePlato NOT LIKE '%sopa%' AND nombrePlato NOT LIKE '%jugo%' AND nombrePlato NOT LIKE '%desayuno%' AND nombrePlato NOT LIKE '%postre%'"
-  }else{
-    consulta = "SELECT * FROM plato WHERE nombrePlato LIKE " + tipoPlatoEscaped
+app.get("/comentarios", async (req, res) => {
+  try {
+    const result = await runQuery("SELECT * FROM comentario");
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(JSON.stringify(result));
+  } catch (error) {
+    res.status(500).send(error.message);
   }
-  
-  connection.query(consulta, (error, result) => {
-    if (error) {
-      res.status(500).send(error);
-    } else {
-      res.setHeader("Content-Type", "application/json"); 
-      res.status(200).send(JSON.stringify(result));
-    }
-  });
 });
 
+//mostrar los menu
+app.get("/menu", async (req, res) => {
+  try {
+    const result = await runQuery("SELECT * FROM menu");
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(JSON.stringify(result));
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
+app.get("/menus/:tipo", async (req, res) => {
+  try {
+    const tipoMenu = req.params.tipo;
+    let consulta = "";
+  
+    // Sanitizar el tipoMenu para evitar inyección de SQL
+    const tipoMenuEscaped = mysql.escape(`${tipoMenu}%`);
+    if (tipoMenu == "menufrito") {
+      consulta =
+        "SELECT * FROM menu WHERE nombreMenu NOT LIKE '%sopa%' AND nombreMenu NOT LIKE '%jugo%' AND nombreMenu NOT LIKE '%desayuno%' AND nombreMenu NOT LIKE '%postre%'";
+    } else {
+      consulta = "SELECT * FROM menu WHERE nombreMenu LIKE " + tipoMenuEscaped;
+    }
+  
+    const result = await runQuery(consulta);
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(JSON.stringify(result));
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
 //buscar por correo al cliente
-  app.get('/cliente/correo/:correo', (req, res) => {
-	const clientCorreo = req.params.correo;
-	var connection = mysql.createConnection(baseD);
-	connection.query('SELECT * FROM cliente WHERE correo = ?', clientCorreo, (error, result) => {
-	  if (error) {
-		res.status(500).send(error);
-	  } else {
-		if (result.length > 0) {
-		  res.setHeader('Content-Type', 'application/json');
-		  res.status(200).send(JSON.stringify(result[0])); // Devuelve el primer cliente encontrado
-		} else {
-		  res.status(404).send('Cliente no encontrado');
-		}
-	  }
-	});
-	connection.end();
-  });
+app.get("/correo/:correo", async (req, res) => {
+  try {
+    const clienteCorreo = req.params.correo;
+    const result = await runQuery("SELECT * FROM cliente WHERE correo = ?", [clienteCorreo]);
+    if (result.length > 0) {
+      res.status(200).json(result[0]); // Devuelve el primer cliente encontrado
+    } else {
+      res.status(404).send("Cliente no encontrado");
+    }
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
 
-app.listen(4000, () => console.log("hola soy el servidor"));
+app.listen(4000, () => console.log("Servidor iniciado en el puerto 4000"));
