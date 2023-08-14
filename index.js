@@ -30,10 +30,10 @@ function runQuery(sql, params) {
   });
 }
 
-app.post("/restaurante/cliente", async (req, res) => {
+app.post("/login", async (req, res) => {
   try {
-    const { correo, contraseña } = req.body;
-    const values = [correo, contraseña];
+    const { email, password } = req.body;
+    const values = [email, password];
     const result = await runQuery(
       "SELECT * FROM cliente WHERE correo = ? AND contraseña = ?",
       values
@@ -49,24 +49,24 @@ app.post("/restaurante/cliente", async (req, res) => {
   }
 });
 
-app.post("/cambioUsuario", async (req, res) => {
+app.post("/changeUser", async (req, res) => {
   try {
-    const { nombre, newNombre, newContraseña } = req.body;
-    const params = [newNombre, newContraseña, nombre];
+    const { name, newName, newPassword } = req.body;
+    const params = [newName, newPassword, name];
     await runQuery(
       "UPDATE cliente SET nombre = ?, contraseña = ? WHERE nombre = ?",
       params
     );
-    res.status(200).send("Usuario cambiado");
+    res.status(200).send("Usuario cambiado con exito");
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
 
-app.post("/restaurante/registro", async (req, res) => {
+app.post("/register", async (req, res) => {
   try {
-    const { nombre, correo, contraseña, telefono, avatar } = req.body;
-    const params = [[nombre, correo, contraseña, telefono, avatar]];
+    const { name, email, password, phone, avatar } = req.body;
+    const params = [[name, email, password, phone, avatar]];
     await runQuery(
       "INSERT INTO cliente (nombre, correo, contraseña, telefono, avatar) VALUES ?",
       [params]
@@ -77,7 +77,7 @@ app.post("/restaurante/registro", async (req, res) => {
   }
 });
 
-app.post("/restaurante/comentarios", async (req, res) => {
+app.post("/addComments", async (req, res) => {
   try {
     const { avatar, nombre, fechaYhora, comentario } = req.body;
     const params = [[avatar, nombre, fechaYhora, comentario]];
@@ -91,11 +91,11 @@ app.post("/restaurante/comentarios", async (req, res) => {
   }
 });
 
-app.post("/detalleCompraDelivery", async (req, res) => {
+app.post("/detailBuyDelivery", async (req, res) => {
   try {
     const { nombre, direccion, telefono, tarjeta } = req.body;
     const nombresOrden = req.body.nombresOrden;
-    const totalPrecio = req.body.totalPrecio;
+    const totalPrecio = req.body.totalPrice;
     const fechaEntrega = req.body.fechaEntrega;
     const horaEnvio = req.body.horaEnvio;
 
@@ -120,11 +120,11 @@ app.post("/detalleCompraDelivery", async (req, res) => {
   }
 });
 
-app.post("/detalleCompraRestaurante", async (req, res) => {
+app.post("/detailPurchaseRestaurant", async (req, res) => {
   try {
     const { nombre, telefono, tarjeta } = req.body;
     const nombresOrden = req.body.nombresOrden;
-    const totalPrecio = req.body.totalPrecio;
+    const totalPrecio = req.body.totalPrice;
     const fechaCompra = req.body.fechaEntrega;
     const horaCompra = req.body.horaEnvio;
     const tiempoLlegada = req.body.valorCombox;
@@ -152,7 +152,7 @@ app.post("/detalleCompraRestaurante", async (req, res) => {
   }
 });
 
-app.get("/comentarios", async (req, res) => {
+app.get("/comments", async (req, res) => {
   try {
     const result = await runQuery("SELECT * FROM comentario");
     res.setHeader("Content-Type", "application/json");
@@ -204,7 +204,7 @@ app.get("/menus/:tipo", async (req, res) => {
     let consulta = "";
 
     const tipoMenuEscaped = mysql.escape(`${tipoMenu}%`);
-    if (tipoMenu == "menufrito") {
+    if (tipoMenu == "friedmenu") {
       consulta =
         "SELECT * FROM menu WHERE nombreMenu NOT LIKE '%sopa%' AND nombreMenu NOT LIKE '%jugo%' AND nombreMenu NOT LIKE '%desayuno%' AND nombreMenu NOT LIKE '%postre%'";
     } else {
@@ -220,11 +220,11 @@ app.get("/menus/:tipo", async (req, res) => {
 });
 
 //buscar por correo al cliente
-app.get("/correo/:correo", async (req, res) => {
+app.get("/email/:email", async (req, res) => {
   try {
-    const clienteCorreo = req.params.correo;
+    const clientCorreo = req.params.email;
     const result = await runQuery("SELECT * FROM cliente WHERE correo = ?", [
-      clienteCorreo,
+      clientCorreo,
     ]);
     if (result.length > 0) {
       res.status(200).json(result[0]); // Devuelve el primer cliente encontrado
