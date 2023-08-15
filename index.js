@@ -2,10 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
 const app = express();
+const responseTime = require("response-time")
 app.use(cors());
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
+
+app.use(responseTime())
 
 const baseD = {
   host: "localhost",
