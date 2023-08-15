@@ -5,7 +5,6 @@ const app = express();
 const redis = require("redis");
 const responseTime = require("response-time");
 const bodyParser = require("body-parser");
-const crypto = require("crypto");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(cors());
@@ -49,6 +48,7 @@ function checkCache(req, res, next) {
       console.error("Error en Redis:", err);
       next();
     } else if (data !== null) {
+      console.log("Datos almacenados en Redis:", data)
       res.setHeader("Content-Type", "application/json");
       res.status(200).send(data);
     } else {
@@ -57,7 +57,7 @@ function checkCache(req, res, next) {
   });
 }
 
-app.post("/login", checkCache, async (req, res) => {
+app.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     const values = [email, password];
@@ -67,16 +67,7 @@ app.post("/login", checkCache, async (req, res) => {
     );
 
     if (result.length > 0) {
-      const response = "Usuario encontrado";
-      const key = req.originalUrl + JSON.stringify(req.body); // Clave basada en la solicitud
-      const hash = crypto.createHash("md5").update(key).digest("hex"); // Generar el hash MD5
-      // Almacenar la respuesta en caché en Redis durante 60 segundos (puedes ajustar el tiempo)
-      redisClient.setex(hash, 60, response, (err) => {
-        if (err) {
-          console.error("Error al almacenar en caché:", err);
-        }
-      });
-      res.status(200).send(response);
+      res.status(200).send("Usuario encontrado");
     } else {
       res.status(400).send("Cliente no existe");
     }
@@ -212,12 +203,11 @@ app.get("/menu", checkCache, async (req, res) => {
   try {
     // Aquí deberías definir la función runQuery para obtener los datos de la base de datos
     const result = await runQuery("SELECT * FROM menu");
-    
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
 
     // Guardar en caché el resultado en Redis
-    redisClient.setex(req.originalUrl, 3600, JSON.stringify(result)); // El resultado se almacenará en caché por una hora (3600 segundos)
+    redisClient.setex(req.originalUrl, 3600, JSON.stringify(result));
   } catch (error) {
     res.status(500).send(error.message);
   }
