@@ -2,13 +2,15 @@ const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2");
 const app = express();
-const responseTime = require("response-time")
+const redis = require("redis");
+const responseTime = require("response-time");
 app.use(cors());
 const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
 
 app.use(responseTime())
+
 
 const baseD = {
   host: "localhost",
@@ -19,6 +21,7 @@ const baseD = {
 };
 
 const connection = mysql.createPool(baseD);
+const redisClient = redis.createClient();
 
 // Función para ejecutar una consulta en la base de datos
 function runQuery(sql, params) {
@@ -30,6 +33,27 @@ function runQuery(sql, params) {
         resolve(result);
       }
     });
+  });
+}
+
+// Manejar errores de conexión a Redis
+redisClient.on("error", (err) => {
+  console.error("Error en Redis:", err);
+});
+
+// Middleware para manejar el almacenamiento en caché con Redis
+function checkCache(req, res, next) {
+  const key = req.originalUrl;
+  redisClient.get(key, (err, data) => {
+    if (err) {
+      console.error("Error en Redis:", err);
+      next(); // Continuar sin caché en caso de error en Redis
+    } else if (data !== null) {
+      res.setHeader("Content-Type", "application/json");
+      res.status(200).send(data);
+    } else {
+      next();
+    }
   });
 }
 
@@ -165,15 +189,24 @@ app.get("/comments", async (req, res) => {
   }
 });
 
-//mostrar los menu
-app.get("/menu", async (req, res) => {
+app.get("/menu", checkCache, async (req, res) => {
   try {
+    // Aquí deberías definir la función runQuery para obtener los datos de la base de datos
     const result = await runQuery("SELECT * FROM menu");
+    
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
+
+    // Guardar en caché el resultado en Redis
+    redisClient.setex(req.originalUrl, 3600, JSON.stringify(result)); // El resultado se almacenará en caché por una hora (3600 segundos)
   } catch (error) {
     res.status(500).send(error.message);
   }
+});
+
+// Cerrar la conexión a Redis cuando la aplicación se apaga
+process.on("exit", () => {
+  redisClient.quit(); // Cerrar la conexión de forma segura
 });
 
 app.get("/historial/:cliente", async (req, res) => {
