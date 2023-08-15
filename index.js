@@ -4,11 +4,11 @@ const mysql = require("mysql2");
 const app = express();
 const redis = require("redis");
 const responseTime = require("response-time");
-app.use(cors());
 const bodyParser = require("body-parser");
+const crypto = require("crypto");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
-
+app.use(cors());
 app.use(responseTime())
 
 
@@ -47,7 +47,7 @@ function checkCache(req, res, next) {
   redisClient.get(key, (err, data) => {
     if (err) {
       console.error("Error en Redis:", err);
-      next(); // Continuar sin caché en caso de error en Redis
+      next();
     } else if (data !== null) {
       res.setHeader("Content-Type", "application/json");
       res.status(200).send(data);
@@ -57,7 +57,7 @@ function checkCache(req, res, next) {
   });
 }
 
-app.post("/login", async (req, res) => {
+app.post("/login", checkCache, async (req, res) => {
   try {
     const { email, password } = req.body;
     const values = [email, password];
@@ -67,7 +67,16 @@ app.post("/login", async (req, res) => {
     );
 
     if (result.length > 0) {
-      res.status(200).send("Usuario encontrado");
+      const response = "Usuario encontrado";
+      const key = req.originalUrl + JSON.stringify(req.body); // Clave basada en la solicitud
+      const hash = crypto.createHash("md5").update(key).digest("hex"); // Generar el hash MD5
+      // Almacenar la respuesta en caché en Redis durante 60 segundos (puedes ajustar el tiempo)
+      redisClient.setex(hash, 60, response, (err) => {
+        if (err) {
+          console.error("Error al almacenar en caché:", err);
+        }
+      });
+      res.status(200).send(response);
     } else {
       res.status(400).send("Cliente no existe");
     }
@@ -75,6 +84,7 @@ app.post("/login", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
+
 
 app.post("/changeUser", async (req, res) => {
   try {
@@ -179,15 +189,24 @@ app.post("/detailPurchaseRestaurant", async (req, res) => {
   }
 });
 
-app.get("/comments", async (req, res) => {
+app.get("/comments", checkCache, async (req, res) => {
   try {
     const result = await runQuery("SELECT * FROM comentario");
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
+
+    // Almacenar en caché los resultados en Redis
+    const key = req.originalUrl;
+    redisClient.setex(key, 60, JSON.stringify(result), (err) => {
+      if (err) {
+        console.error("Error al almacenar en caché:", err);
+      }
+    });
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
+
 
 app.get("/menu", checkCache, async (req, res) => {
   try {
