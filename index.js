@@ -294,7 +294,23 @@ app.get("/email/:email", checkCache, async (req, res) => {
   }
 });
 
-// Cerrar la conexión a Redis cuando la aplicación se apaga
+
+app.delete('/delete-key/email/:key', (req, res) => {
+  const deleteKey = "/email/"+ req.params.key;
+
+  redisClient.del(deleteKey, (err, reply) => {
+    if (err) {
+      res.status(500).json({ message: 'Error al eliminar la clave.' });
+    } else {
+      if (reply === 1) {
+        res.json({ message: 'Clave eliminada correctamente.' });
+      } else {
+        res.json({ message: 'La clave no existe en Redis.' });
+      }
+    }
+  });
+});
+
 process.on("exit", () => {
   redisClient.quit(); // Cerrar la conexión de forma segura
 });
