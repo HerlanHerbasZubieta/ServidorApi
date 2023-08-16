@@ -35,11 +35,6 @@ function runQuery(sql, params) {
   });
 }
 
-// Manejar errores de conexión a Redis
-redisClient.on("error", (err) => {
-  console.error("Error en Redis:", err);
-});
-
 // Middleware para manejar el almacenamiento en caché con Redis
 function checkCache(req, res, next) {
   const key = req.originalUrl;
@@ -186,7 +181,7 @@ app.get("/comments", checkCache, async (req, res) => {
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
 
-    // Almacenar en caché los resultados en Redis
+    // Almacena en caché los resultados en Redis
     const key = req.originalUrl;
     redisClient.setex(key, 60, JSON.stringify(result), (err) => {
       if (err) {
@@ -201,22 +196,17 @@ app.get("/comments", checkCache, async (req, res) => {
 
 app.get("/menu", checkCache, async (req, res) => {
   try {
-    // Aquí deberías definir la función runQuery para obtener los datos de la base de datos
     const result = await runQuery("SELECT * FROM menu");
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
 
-    // Guardar en caché el resultado en Redis
+    // Guarda en caché el resultado en Redis
     redisClient.setex(req.originalUrl, 3600, JSON.stringify(result));
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
 
-// Cerrar la conexión a Redis cuando la aplicación se apaga
-process.on("exit", () => {
-  redisClient.quit(); // Cerrar la conexión de forma segura
-});
 
 app.get("/historial/:cliente", async (req, res) => {
   try {
@@ -243,20 +233,21 @@ app.get("/historial/:cliente", async (req, res) => {
   }
 });
 
-app.get("/menus/:tipo", async (req, res) => {
+app.get("/menus/:tipo", checkCache, async (req, res) => {
   try {
     const tipoMenu = req.params.tipo;
-    let consulta = "";
+    const consulta =
+      tipoMenu === "friedmenu"
+        ? "SELECT * FROM menu WHERE nombreMenu NOT LIKE '%sopa%' AND nombreMenu NOT LIKE '%jugo%' AND nombreMenu NOT LIKE '%desayuno%' AND nombreMenu NOT LIKE '%postre%'"
+        : "SELECT * FROM menu WHERE nombreMenu LIKE ?";
 
-    const tipoMenuEscaped = mysql.escape(`${tipoMenu}%`);
-    if (tipoMenu == "friedmenu") {
-      consulta =
-        "SELECT * FROM menu WHERE nombreMenu NOT LIKE '%sopa%' AND nombreMenu NOT LIKE '%jugo%' AND nombreMenu NOT LIKE '%desayuno%' AND nombreMenu NOT LIKE '%postre%'";
-    } else {
-      consulta = "SELECT * FROM menu WHERE nombreMenu LIKE " + tipoMenuEscaped;
-    }
+    const result = await runQuery(consulta, [`${tipoMenu}%`]);
 
-    const result = await runQuery(consulta);
+    // Guardar los datos en caché en Redis
+    const cacheKey = req.originalUrl;
+    const cacheDuration = 3600;
+    redisClient.setex(cacheKey, cacheDuration, JSON.stringify(result));
+
     res.setHeader("Content-Type", "application/json");
     res.status(200).send(JSON.stringify(result));
   } catch (error) {
@@ -264,21 +255,48 @@ app.get("/menus/:tipo", async (req, res) => {
   }
 });
 
-//buscar por correo al cliente
-app.get("/email/:email", async (req, res) => {
+
+app.get("/email/:email", checkCache, async (req, res) => {
   try {
     const clientCorreo = req.params.email;
-    const result = await runQuery("SELECT * FROM cliente WHERE correo = ?", [
-      clientCorreo,
-    ]);
-    if (result.length > 0) {
-      res.status(200).json(result[0]); // Devuelve el primer cliente encontrado
-    } else {
-      res.status(404).send("Cliente no encontrado");
-    }
+    const key = req.originalUrl;
+
+    redisClient.get(key, async (err, cachedData) => {
+      if (err) {
+        console.error("Error en Redis:", err);
+        next();
+      } else if (cachedData !== null) {
+        console.log("Datos almacenados en Redis:", cachedData);
+        res.setHeader("Content-Type", "application/json");
+        res.status(200).send(cachedData);
+      } else {
+        // Si no están en caché, realizar la consulta a la base de datos
+        const result = await runQuery(
+          "SELECT * FROM cliente WHERE correo = ?",
+          [clientCorreo]
+        );
+
+        if (result.length > 0) {
+          res.status(200).json(result);
+          // Almacenar en caché los resultados en Redis
+          redisClient.setex(key, 3600, JSON.stringify(result), (err) => {
+            if (err) {
+              console.error("Error al almacenar en caché:", err);
+            }
+          });
+        } else {
+          res.status(404).send("Cliente no encontrado");
+        }
+      }
+    });
   } catch (error) {
     res.status(500).send(error.message);
   }
+});
+
+// Cerrar la conexión a Redis cuando la aplicación se apaga
+process.on("exit", () => {
+  redisClient.quit(); // Cerrar la conexión de forma segura
 });
 
 app.listen(4000, () => console.log("Servidor iniciado en el puerto 4000"));

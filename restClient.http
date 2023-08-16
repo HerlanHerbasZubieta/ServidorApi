@@ -2,3 +2,6 @@ GET http://localhost:4000/comments
 
 
 GET http://localhost:4000/menu
+
+
+GET http://localhost:4000/menus/friedmenu
