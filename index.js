@@ -116,64 +116,51 @@ app.post("/addComments", async (req, res) => {
 
 app.post("/detailBuyDelivery", async (req, res) => {
   try {
-    const { nombre, direccion, telefono, tarjeta } = req.body;
-    const nombresOrden = req.body.nombresOrden;
-    const totalPrecio = req.body.totalPrice;
-    const fechaEntrega = req.body.fechaEntrega;
-    const horaEnvio = req.body.horaEnvio;
-
-    const detalleCompraData = {
-      nombre,
-      direccion,
-      telefono,
-      tarjeta,
-      nombresOrden,
-      totalPrecio,
-      fechaEntrega,
-      horaEnvio,
+    const { name, addres, phone, numberCard, orderNames, totalPrice, date, hour } = req.body;
+    const purchaseData = {
+      nombre: name,
+      direccion: addres,
+      telefono: phone,
+      tarjeta: numberCard,
+      nombresOrden: orderNames,
+      totalPrecio: totalPrice,
+      fechaEntrega: date,
+      horaEnvio: hour,
     };
 
-    await runQuery(
-      "INSERT INTO detalleCompraDelivery SET ?",
-      detalleCompraData
-    );
-    res.status(200).send("Compra realizada con éxito");
+    await runQuery("INSERT INTO detalleCompraDelivery SET ?", purchaseData);
+
+    res.status(200).send("Purchase completed successfully");
   } catch (error) {
-    res.status(500).send("Error al insertar los datos");
+    res.status(500).send("Error inserting data");
   }
 });
+
+
 
 app.post("/detailPurchaseRestaurant", async (req, res) => {
   try {
-    const { nombre, telefono, tarjeta } = req.body;
-    const nombresOrden = req.body.nombresOrden;
-    const totalPrecio = req.body.totalPrice;
-    const fechaCompra = req.body.fechaEntrega;
-    const horaCompra = req.body.horaEnvio;
-    const tiempoLlegada = req.body.valorCombox;
-    const numeroMesa = req.body.numeroMesa;
-
-    const detalleCompraData = {
-      numeroMesa,
-      tarjeta,
-      nombresOrden,
-      tiempoLlegada,
-      fechaCompra,
-      horaCompra,
-      telefono,
-      nombre,
-      totalPrecio,
+    const { numberTable, numberCard, orderNames, valueCombox, date, hour, phone, name, totalPrice } = req.body;
+    const purchaseData = {
+      numeroMesa: numberTable,
+      tarjeta: numberCard,
+      nombresOrden: orderNames,
+      tiempoLlegada: valueCombox,
+      fechaCompra: date,
+      horaCompra: hour,
+      telefono: phone,
+      nombre: name,
+      totalPrecio: totalPrice,
     };
 
-    await runQuery(
-      "INSERT INTO detallecomprarestaurante SET ?",
-      detalleCompraData
-    );
-    res.status(200).send("Compra realizada con éxito");
+    await runQuery("INSERT INTO detallecomprarestaurante SET ?", purchaseData);
+
+    res.status(200).send("Purchase completed successfully");
   } catch (error) {
-    res.status(500).send("Error al insertar los datos");
+    res.status(500).send("Error inserting data");
   }
 });
+
 
 app.get("/comments", checkCache, async (req, res) => {
   try {
