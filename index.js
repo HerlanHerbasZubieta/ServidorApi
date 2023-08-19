@@ -116,7 +116,7 @@ app.post("/addComments", async (req, res) => {
 
 app.post("/detailBuyDelivery", async (req, res) => {
   try {
-    const { name, addres, phone, numberCard, orderNames, totalPrice, date, hour } = req.body;
+    const { name, addres, phone, numberCard, orderNames, totalPrice, date, hour, idClient } = req.body;
     const purchaseData = {
       nombre: name,
       direccion: addres,
@@ -126,6 +126,7 @@ app.post("/detailBuyDelivery", async (req, res) => {
       totalPrecio: totalPrice,
       fechaEntrega: date,
       horaEnvio: hour,
+      idCliente: idClient,
     };
 
     await runQuery("INSERT INTO detalleCompraDelivery SET ?", purchaseData);
@@ -140,7 +141,7 @@ app.post("/detailBuyDelivery", async (req, res) => {
 
 app.post("/detailPurchaseRestaurant", async (req, res) => {
   try {
-    const { numberTable, numberCard, orderNames, valueCombox, date, hour, phone, name, totalPrice } = req.body;
+    const { numberTable, numberCard, orderNames, valueCombox, date, hour, phone, name, totalPrice, idClient } = req.body;
     const purchaseData = {
       numeroMesa: numberTable,
       tarjeta: numberCard,
@@ -151,6 +152,7 @@ app.post("/detailPurchaseRestaurant", async (req, res) => {
       telefono: phone,
       nombre: name,
       totalPrecio: totalPrice,
+      idCliente: idClient,
     };
 
     await runQuery("INSERT INTO detallecomprarestaurante SET ?", purchaseData);
@@ -195,17 +197,19 @@ app.get("/menu", checkCache, async (req, res) => {
 });
 
 
-app.get("/historial/:cliente", async (req, res) => {
+app.get("/record/:idClient", checkCache, async (req, res) => {
   try {
-    const nombreCliente = req.params.cliente;
+    const idClient = req.params.idClient;
+    const cacheKey = `historial:${idClient}`;
+
     const [consulta1, consulta2] = await Promise.all([
       runQuery(
-        "SELECT * FROM detallecomprarestaurante WHERE nombre = ?",
-        nombreCliente
+        "SELECT dd.idCompra, dd.fechaCompra, dd.horaCompra, dd.nombresOrden, dd.numeroMesa, dd.tiempoLlegada, dd.totalPrecio, c.nombre  FROM cliente c JOIN detallecomprarestaurante dd ON c.idCliente = dd.idCliente WHERE c.idCliente = ?",
+        idClient
       ),
       runQuery(
-        "SELECT * FROM detallecompradelivery WHERE nombre = ?",
-        nombreCliente
+        "SELECT dd.idCompra, dd.fechaEntrega, dd.horaEnvio, dd.nombresOrden, dd.direccion, dd.totalPrecio, c.nombre  FROM cliente c JOIN detallecompradelivery dd ON c.idCliente = dd.idCliente WHERE c.idCliente = ?",
+        idClient
       ),
     ]);
 
@@ -214,17 +218,20 @@ app.get("/historial/:cliente", async (req, res) => {
       compraDelivery: consulta2,
     };
 
+    const responseData = JSON.stringify(consultas);
+    redisClient.setex(cacheKey, 3600, responseData);
     res.json(consultas);
   } catch (error) {
     res.status(500).send(error.message);
   }
 });
 
+
 app.get("/menus/:tipo", checkCache, async (req, res) => {
   try {
     const tipoMenu = req.params.tipo;
     const consulta =
-      tipoMenu === "friedmenu"
+      tipoMenu === "menuFried"
         ? "SELECT * FROM menu WHERE nombreMenu NOT LIKE '%sopa%' AND nombreMenu NOT LIKE '%jugo%' AND nombreMenu NOT LIKE '%desayuno%' AND nombreMenu NOT LIKE '%postre%'"
         : "SELECT * FROM menu WHERE nombreMenu LIKE ?";
 
