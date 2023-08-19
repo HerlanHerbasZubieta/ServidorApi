@@ -8,8 +8,7 @@ const bodyParser = require("body-parser");
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
 app.use(cors());
-app.use(responseTime())
-
+app.use(responseTime());
 
 const baseD = {
   host: "localhost",
@@ -43,7 +42,7 @@ function checkCache(req, res, next) {
       console.error("Error en Redis:", err);
       next();
     } else if (data !== null) {
-      console.log("Datos almacenados en Redis:", data)
+      console.log("Datos almacenados en Redis:", data);
       res.setHeader("Content-Type", "application/json");
       res.status(200).send(data);
     } else {
@@ -70,7 +69,6 @@ app.post("/login", async (req, res) => {
     res.status(500).send(error.message);
   }
 });
-
 
 app.post("/changeUser", async (req, res) => {
   try {
@@ -114,6 +112,32 @@ app.post("/addComments", async (req, res) => {
   }
 });
 
+app.post("/addFavorite", async (req, res) => {
+  try {
+    const { idMenu, idCliente } = req.body;
+    const params = [[idMenu, idCliente]];
+    await runQuery("INSERT INTO favoritoorden ( idMenu, idCliente ) VALUES ?", [
+      params,
+    ]);
+    res.status(200).send("Orden favorito agregado");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+app.post("/deleteFavorite/:nameFavorite", async (req, res) => {
+  try {
+    const nameFavorite = req.params.nameFavorite;
+    
+    await runQuery("DELETE FROM favoritoorden WHERE idMenu IN (SELECT idMenu FROM menu WHERE nombreMenu = ?)", nameFavorite);
+    
+    res.status(200).send("Orden favorito eliminado");
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+
 app.post("/detailBuyDelivery", async (req, res) => {
   try {
     const { name, addres, phone, numberCard, orderNames, totalPrice, date, hour, idClient } = req.body;
@@ -136,8 +160,6 @@ app.post("/detailBuyDelivery", async (req, res) => {
     res.status(500).send("Error inserting data");
   }
 });
-
-
 
 app.post("/detailPurchaseRestaurant", async (req, res) => {
   try {
@@ -163,7 +185,6 @@ app.post("/detailPurchaseRestaurant", async (req, res) => {
   }
 });
 
-
 app.get("/comments", checkCache, async (req, res) => {
   try {
     const result = await runQuery("SELECT * FROM comentario");
@@ -182,7 +203,6 @@ app.get("/comments", checkCache, async (req, res) => {
   }
 });
 
-
 app.get("/menu", checkCache, async (req, res) => {
   try {
     const result = await runQuery("SELECT * FROM menu");
@@ -195,6 +215,26 @@ app.get("/menu", checkCache, async (req, res) => {
     res.status(500).send(error.message);
   }
 });
+
+app.get("/favoritesOrders/:idClient", async (req, res) => {
+  try {
+    const idClient = req.params.idClient;
+
+    // Consulta la base de datos directamente sin verificar la caché
+    const result = await runQuery(
+      "SELECT m.nombreMenu, m.imagen, m.descripcionMenu FROM favoritoorden fo JOIN menu m ON fo.idMenu = m.idMenu WHERE fo.idCliente = ?",
+      [idClient]
+    );
+
+    // Devuelve los datos obtenidos de la base de datos
+    res.setHeader("Content-Type", "application/json");
+    res.status(200).send(JSON.stringify(result));
+  } catch (error) {
+    res.status(500).send(error.message);
+  }
+});
+
+
 
 
 app.get("/record/:idClient", checkCache, async (req, res) => {
@@ -226,7 +266,6 @@ app.get("/record/:idClient", checkCache, async (req, res) => {
   }
 });
 
-
 app.get("/menus/:tipo", checkCache, async (req, res) => {
   try {
     const tipoMenu = req.params.tipo;
@@ -249,7 +288,6 @@ app.get("/menus/:tipo", checkCache, async (req, res) => {
   }
 });
 
-
 app.get("/email/:email", checkCache, async (req, res) => {
   try {
     const clientCorreo = req.params.email;
@@ -264,7 +302,6 @@ app.get("/email/:email", checkCache, async (req, res) => {
         res.setHeader("Content-Type", "application/json");
         res.status(200).send(cachedData);
       } else {
-        // Si no están en caché, realizar la consulta a la base de datos
         const result = await runQuery(
           "SELECT * FROM cliente WHERE correo = ?",
           [clientCorreo]
@@ -272,7 +309,6 @@ app.get("/email/:email", checkCache, async (req, res) => {
 
         if (result.length > 0) {
           res.status(200).json(result);
-          // Almacenar en caché los resultados en Redis
           redisClient.setex(key, 3600, JSON.stringify(result), (err) => {
             if (err) {
               console.error("Error al almacenar en caché:", err);
@@ -288,18 +324,17 @@ app.get("/email/:email", checkCache, async (req, res) => {
   }
 });
 
-
-app.delete('/delete-key/email/:key', (req, res) => {
-  const deleteKey = "/email/"+ req.params.key;
+app.delete("/delete-key/email/:key", (req, res) => {
+  let deleteKey = "/email/" + req.params.key;
 
   redisClient.del(deleteKey, (err, reply) => {
     if (err) {
-      res.status(500).json({ message: 'Error al eliminar la clave.' });
+      res.status(500).json({ message: "Error al eliminar la clave." });
     } else {
       if (reply === 1) {
-        res.json({ message: 'Clave eliminada correctamente.' });
+        res.json({ message: "Clave eliminada correctamente." });
       } else {
-        res.json({ message: 'La clave no existe en Redis.' });
+        res.json({ message: "La clave no existe en Redis." });
       }
     }
   });
